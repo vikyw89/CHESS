@@ -1,0 +1,67 @@
+.
+├── env.example
+├── images
+│   └── full_pipeline.png
+├── LICENSE
+├── model_deployment.txt
+├── poetry.lock
+├── pyproject.toml
+├── README.md
+├── requirements.txt
+├── run
+│   ├── run_main.sh
+│   └── run_preprocess.sh
+├── schema.txt
+├── src
+│   ├── database_utils
+│   │   ├── db_catalog
+│   │   │   ├── csv_utils.py
+│   │   │   ├── preprocess.py
+│   │   │   └── search.py
+│   │   ├── db_info.py
+│   │   ├── db_values
+│   │   │   ├── preprocess.py
+│   │   │   └── search.py
+│   │   ├── execution.py
+│   │   ├── schema_generator.py
+│   │   ├── schema.py
+│   │   └── sql_parser.py
+│   ├── __init__.py
+│   ├── llm
+│   │   ├── engine_configs.py
+│   │   ├── models.py
+│   │   ├── parsers.py
+│   │   └── prompts.py
+│   ├── main.py
+│   ├── pipeline
+│   │   ├── candidate_generation.py
+│   │   ├── column_filtering.py
+│   │   ├── column_selection.py
+│   │   ├── context_retrieval.py
+│   │   ├── entity_retrieval.py
+│   │   ├── evaluation.py
+│   │   ├── keyword_extraction.py
+│   │   ├── pipeline_manager.py
+│   │   ├── revision.py
+│   │   ├── table_selection.py
+│   │   ├── utils.py
+│   │   └── workflow_builder.py
+│   ├── preprocess.py
+│   └── runner
+│       ├── database_manager.py
+│       ├── logger.py
+│       ├── run_manager.py
+│       ├── statistics_manager.py
+│       └── task.py
+└── templates
+    ├── template_candidate_generation.txt
+    ├── template_column_filtering.txt
+    ├── template_column_filtering_with_examples_llama.txt
+    ├── template_column_filtering_with_examples.txt
+    ├── template_column_selection.txt
+    ├── template_finetuned_candidate_generation.txt
+    ├── template_keyword_extraction.txt
+    ├── template_revision.txt
+    └── template_table_selection.txt
+
+11 directories, 54 files
