@@ -14,7 +14,7 @@ def get_db_all_tables(db_path: str) -> List[str]:
         List[str]: A list of table names.
     """
     try:
-        raw_table_names = execute_sql(db_path, "SELECT name FROM sqlite_master WHERE type='table';")
+        raw_table_names = execute_sql(db_path, "SHOW TABLES;")
         return [table[0].replace('\"', '').replace('`', '') for table in raw_table_names if table[0] != "sqlite_sequence"]
     except Exception as e:
         logging.error(f"Error in get_db_all_tables: {e}")
@@ -32,7 +32,7 @@ def get_table_all_columns(db_path: str, table_name: str) -> List[str]:
         List[str]: A list of column names.
     """
     try:
-        table_info_rows = execute_sql(db_path, f"PRAGMA table_info(`{table_name}`);")
+        table_info_rows = execute_sql(db_path, f"SHOW COLUMNS FROM (`{table_name}`);")
         return [row[1].replace('\"', '').replace('`', '') for row in table_info_rows]
     except Exception as e:
         logging.error(f"Error in get_table_all_columns: {e}\nTable: {table_name}")
