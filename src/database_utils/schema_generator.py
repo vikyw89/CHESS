@@ -2,10 +2,10 @@ import re
 import logging
 from typing import Dict, List, Optional
 
-from database_utils.execution import execute_sql
-from database_utils.db_info import get_db_schema
-from database_utils.schema import DatabaseSchema, get_primary_keys
-
+from src.database_utils.execution import execute_sql
+from src.database_utils.db_info import get_db_schema
+from src.database_utils.schema import DatabaseSchema, get_primary_keys
+import asyncio
 
 class DatabaseSchemaGenerator:
     """
@@ -35,16 +35,16 @@ class DatabaseSchemaGenerator:
         self.db_path = db_path
         self.add_examples = add_examples
         if self.db_id not in DatabaseSchemaGenerator.CACHED_DB_SCHEMA:
-            DatabaseSchemaGenerator._load_schema_into_cache(
+            asyncio.run(DatabaseSchemaGenerator._load_schema_into_cache(
                 db_id=db_id, db_path=db_path
-            )
+            ))
         self.schema_structure = tentative_schema or DatabaseSchema()
         self.schema_with_examples = schema_with_examples or DatabaseSchema()
         self.schema_with_descriptions = schema_with_descriptions or DatabaseSchema()
-        self._initialize_schema_structure()
+        asyncio.run(self._initialize_schema_structure())
 
     @staticmethod
-    def _set_primary_keys(db_path: str, database_schema: DatabaseSchema) -> None:
+    async def _set_primary_keys(db_path: str, database_schema: DatabaseSchema) -> None:
         """
         Sets primary keys in the database schema.
 
@@ -54,16 +54,14 @@ class DatabaseSchemaGenerator:
         """
         schema_with_primary_keys = {
             table_name: {
-                col[1]: {"primary_key": True}
-                for col in execute_sql(db_path, f"SHOW COLUMNS FROM (`{table_name}`)")
-                if col[5] > 0
+                col[1]: {"primary_key": True} for col in await execute_sql(db_path, f"SHOW COLUMNS FROM `{table_name}`;") if col[3] == "PRI"
             }
             for table_name in database_schema.tables.keys()
         }
         database_schema.set_columns_info(schema_with_primary_keys)
 
     @staticmethod
-    def _set_foreign_keys(db_path: str, database_schema: DatabaseSchema) -> None:
+    async def _set_foreign_keys(db_path: str, database_schema: DatabaseSchema) -> None:
         """
         Sets foreign keys in the database schema.
 
@@ -78,9 +76,9 @@ class DatabaseSchemaGenerator:
             }
             for table_name, table_schema in database_schema.tables.items()
         }
-
+        print("schema_with_references", schema_with_references)
         for table_name, columns in schema_with_references.items():
-            foreign_keys_info = execute_sql(
+            foreign_keys_info = await execute_sql(
                 db_path,
                 f"""
     SELECT 
@@ -90,11 +88,8 @@ class DatabaseSchemaGenerator:
     FROM 
         INFORMATION_SCHEMA.KEY_COLUMN_USAGE KCU
     WHERE 
-
-
-    
-        KCU.TABLE_NAME = '{table_name}'
-        AND KCU.REFERENCED_TABLE_NAME IS NOT NULL
+        KCU.REFERENCED_TABLE_NAME = '{table_name}'
+        AND KCU.REFERENCED_TABLE_NAME IS NOT NULL;
     """,
             )
             for fk in foreign_keys_info:
@@ -119,7 +114,7 @@ class DatabaseSchemaGenerator:
         database_schema.set_columns_info(schema_with_references)
 
     @classmethod
-    def _load_schema_into_cache(cls, db_id: str, db_path: str) -> None:
+    async def _load_schema_into_cache(cls, db_id: str, db_path: str) -> None:
         """
         Loads database schema into cache.
 
@@ -127,27 +122,27 @@ class DatabaseSchemaGenerator:
             db_id (str): The database identifier.
             db_path (str): The path to the database file.
         """
-        db_schema = DatabaseSchema.from_schema_dict(get_db_schema(db_path))
+        db_schema = DatabaseSchema.from_schema_dict(await get_db_schema(db_path))
         schema_with_type = {
             table_name: {
                 col[1]: {"type": col[2]}
-                for col in execute_sql(
-                    db_path, f"PRAGMA table_info(`{table_name}`)", fetch="all"
+                for col in await execute_sql(
+                    db_path, f"SHOW COLUMNS FROM `{table_name}`", fetch="all"
                 )
             }
             for table_name in db_schema.tables.keys()
         }
         db_schema.set_columns_info(schema_with_type)
         cls.CACHED_DB_SCHEMA[db_id] = db_schema
-        cls._set_primary_keys(db_path, cls.CACHED_DB_SCHEMA[db_id])
-        cls._set_foreign_keys(db_path, cls.CACHED_DB_SCHEMA[db_id])
+        await cls._set_primary_keys(db_path, cls.CACHED_DB_SCHEMA[db_id])
+        await cls._set_foreign_keys(db_path, cls.CACHED_DB_SCHEMA[db_id])
 
-    def _initialize_schema_structure(self) -> None:
+    async def _initialize_schema_structure(self) -> None:
         """
         Initializes the schema structure with table and column info, examples, and descriptions.
         """
         self._load_table_and_column_info()
-        self._load_column_examples()
+        await self._load_column_examples()
         self._load_column_descriptions()
 
     def _load_table_and_column_info(self) -> None:
@@ -162,7 +157,7 @@ class DatabaseSchemaGenerator:
             field_names=["type", "primary_key", "foreign_keys", "referenced_by"],
         )
 
-    def _load_column_examples(self) -> None:
+    async def _load_column_examples(self) -> None:
         """
         Loads examples for columns in the schema.
         """
@@ -176,7 +171,7 @@ class DatabaseSchemaGenerator:
                     (column_info.type.lower()) == "date"
                     or ("date" in column_name.lower())
                 ):
-                    example = execute_sql(
+                    example = await execute_sql(
                         db_path=self.db_path,
                         sql=f"SELECT DISTINCT `{column_name}` FROM `{table_name}` WHERE `{column_name}` IS NOT NULL",
                         fetch="random",
@@ -199,7 +194,7 @@ class DatabaseSchemaGenerator:
             ],
         )
 
-    def _extract_create_ddl_commands(self) -> Dict[str, str]:
+    async def _extract_create_ddl_commands(self) -> Dict[str, str]:
         """
         Extracts DDL commands to create tables in the schema.
 
@@ -208,7 +203,7 @@ class DatabaseSchemaGenerator:
         """
         ddl_commands = {}
         for table_name in self.schema_structure.tables.keys():
-            create_prompt = execute_sql(
+            create_prompt = await execute_sql(
                 db_path=self.db_path,
                 sql=f"SELECT sql FROM sqlite_master WHERE type='table' AND name='{table_name}';",
                 fetch="one",
@@ -355,7 +350,7 @@ class DatabaseSchemaGenerator:
         )
         return joint_string.replace("\n", " ") if joint_string else ""
 
-    def generate_schema_string(self, include_value_description: bool = False) -> str:
+    async def generate_schema_string(self, include_value_description: bool = False) -> str:
         """
         Generates a schema string with descriptions and examples.
 
@@ -365,7 +360,7 @@ class DatabaseSchemaGenerator:
         Returns:
             str: The generated schema string.
         """
-        ddl_commands = self._extract_create_ddl_commands()
+        ddl_commands = await self._extract_create_ddl_commands()
         for table_name, ddl_command in ddl_commands.items():
             ddl_command = re.sub(r"\s+", " ", ddl_command.strip())
             create_table_match = re.match(

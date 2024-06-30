@@ -1,3 +1,4 @@
+import asyncio
 import os
 import random
 import logging
@@ -42,9 +43,6 @@ async def execute_sql(db_path: str, sql: str, fetch: Union[str, int] = "all") ->
             cursor = await conn.execute(text(sql))
             if fetch == "all":
                 return cursor.fetchall()
-            
-
-
             elif fetch == "one":
                 return cursor.fetchone()
             elif fetch == "random":
@@ -145,7 +143,7 @@ async def validate_sql_query(
         return {"SQL": sql, "RESULT": str(e), "STATUS": "ERROR"}
 
 
-def aggregate_sqls(db_path: str, sqls: List[str]) -> str:
+async def aggregate_sqls(db_path: str, sqls: List[str]) -> str:
     """
     Aggregates multiple SQL queries by validating them and clustering based on result sets.
 
@@ -156,7 +154,11 @@ def aggregate_sqls(db_path: str, sqls: List[str]) -> str:
     Returns:
         str: The shortest SQL query from the largest cluster of equivalent queries.
     """
-    results = [validate_sql_query(db_path, sql) for sql in sqls]
+    tasks = []
+    for sql in sqls:
+        tasks.append(validate_sql_query(db_path, sql))
+    
+    results = await asyncio.gather(*tasks)
     clusters = {}
 
     # Group queries by unique result sets
