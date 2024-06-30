@@ -1,8 +1,10 @@
+import os
 import random
 import logging
 from typing import Any, Union, List, Dict
 from func_timeout import func_timeout, FunctionTimedOut
-from sqlalchemy import create_engine, text
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 
 
@@ -19,7 +21,7 @@ def _clean_sql(sql: str) -> str:
     return sql.replace("\n", " ").replace('"', "'").strip("`.")
 
 
-def execute_sql(db_path: str, sql: str, fetch: Union[str, int] = "all") -> Any:
+async def execute_sql(db_path: str, sql: str, fetch: Union[str, int] = "all") -> Any:
     """
     Executes an SQL query on a database and fetches results.
 
@@ -34,12 +36,15 @@ def execute_sql(db_path: str, sql: str, fetch: Union[str, int] = "all") -> Any:
     Raises:
         Exception: If an error occurs during SQL execution.
     """
-    engine = create_engine(url=db_path)
+    async_engine = create_async_engine(url=db_path, echo=False)
     try:
-        with engine.connect() as conn:
-            cursor = conn.execute(text(sql))
+        async with async_engine.connect() as conn:
+            cursor = await conn.execute(text(sql))
             if fetch == "all":
                 return cursor.fetchall()
+            
+
+
             elif fetch == "one":
                 return cursor.fetchone()
             elif fetch == "random":
@@ -55,10 +60,10 @@ def execute_sql(db_path: str, sql: str, fetch: Union[str, int] = "all") -> Any:
         logging.error(f"Error in execute_sql: {e}\nSQL: {sql}")
         raise e
     finally:
-        engine.dispose()
+        await async_engine.dispose()
 
 
-def _compare_sqls_outcomes(
+async def _compare_sqls_outcomes(
     db_path: str, predicted_sql: str, ground_truth_sql: str
 ) -> int:
     """
@@ -76,8 +81,8 @@ def _compare_sqls_outcomes(
         Exception: If an error occurs during SQL execution.
     """
     try:
-        predicted_res = execute_sql(db_path, predicted_sql)
-        ground_truth_res = execute_sql(db_path, ground_truth_sql)
+        predicted_res = await execute_sql(db_path, predicted_sql)
+        ground_truth_res = await execute_sql(db_path, ground_truth_sql)
         return int(set(predicted_res) == set(ground_truth_res))
     except Exception as e:
         logging.critical(f"Error comparing SQL outcomes: {e}")
@@ -118,7 +123,7 @@ def compare_sqls(
     return {"exec_res": res, "exec_err": error}
 
 
-def validate_sql_query(
+async def validate_sql_query(
     db_path: str, sql: str, max_returned_rows: int = 30
 ) -> Dict[str, Union[str, Any]]:
     """
@@ -133,7 +138,7 @@ def validate_sql_query(
         dict: A dictionary with the SQL query, result, and status.
     """
     try:
-        result = execute_sql(db_path, sql, fetch=max_returned_rows)
+        result = await execute_sql(db_path, sql, fetch=max_returned_rows)
         return {"SQL": sql, "RESULT": result, "STATUS": "OK"}
     except Exception as e:
         logging.error(f"Error in validate_sql_query: {e}")

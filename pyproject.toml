@@ -41,7 +41,7 @@ safetensors = "*"
 scikit-learn = "*"
 scipy = "*"
 sentence-transformers = "*"
-sqlalchemy = "*"
+sqlalchemy = {extras = ["asyncio"], version = "^2.0.31"}
 sqlglot = "*"
 tiktoken = "*"
 tokenizers = "*"
@@ -50,6 +50,9 @@ transformers = "*"
 typing-extensions = "*"
 datasketch = "*"
 nest-asyncio = "^1.6.0"
+pytest = "^8.2.2"
+pymysql = "^1.1.1"
+aiomysql = "^0.2.0"
 
 
 
